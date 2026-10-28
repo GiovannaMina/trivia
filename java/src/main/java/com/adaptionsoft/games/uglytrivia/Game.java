@@ -1,35 +1,21 @@
 package com.adaptionsoft.games.uglytrivia;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 
+// Orquestra uma partida de Trivia: mantém a lista de jogadores, controla de
+// quem é a vez e aplica as regras de cada rodada (rolar o dado, responder certo
+// ou errado). A geração e a entrega das perguntas ficam em QuestionDeck e o
+// estado individual de cada jogador em Player.
+// Author: lukasnascimento1
 public class Game {
 
     private static final int BOARD_SIZE = 12;
-    private static final int QUESTIONS_PER_CATEGORY = 50;
 
     private final List<Player> players = new ArrayList<>();
-
-    private final LinkedList<String> popQuestions = new LinkedList<>();
-    private final LinkedList<String> scienceQuestions = new LinkedList<>();
-    private final LinkedList<String> sportsQuestions = new LinkedList<>();
-    private final LinkedList<String> rockQuestions = new LinkedList<>();
+    private final QuestionDeck questions = new QuestionDeck();
 
     private int currentPlayer = 0;
-
-    public Game() {
-        for (int i = 0; i < QUESTIONS_PER_CATEGORY; i++) {
-            popQuestions.addLast("Pop Question " + i);
-            scienceQuestions.addLast("Science Question " + i);
-            sportsQuestions.addLast("Sports Question " + i);
-            rockQuestions.addLast(createRockQuestion(i));
-        }
-    }
-
-    public String createRockQuestion(int index) {
-        return "Rock Question " + index;
-    }
 
     public boolean isPlayable() {
         return howManyPlayers() >= 2;
@@ -48,72 +34,27 @@ public class Game {
     }
 
     public void roll(int roll) {
-        Player player = players.get(currentPlayer);
+        Player player = currentPlayer();
 
         System.out.println(player + " is the current player");
         System.out.println("They have rolled a " + roll);
 
-        if (player.isInPenaltyBox()) {
-            player.tryToLeavePenaltyBox(roll);
-
-            if (!player.isGettingOutOfPenaltyBox()) {
-                System.out.println(player + " is not getting out of the penalty box");
-                return;
-            }
-            System.out.println(player + " is getting out of the penalty box");
+        if (player.isInPenaltyBox() && !leavesPenaltyBox(player, roll)) {
+            return;
         }
 
         movePlayerAndAskQuestion(player, roll);
     }
 
-    private void movePlayerAndAskQuestion(Player player, int roll) {
-        player.move(roll, BOARD_SIZE);
-
-        System.out.println(player + "'s new location is " + player.getPlace());
-        System.out.println("The category is " + currentCategory());
-        askQuestion();
-    }
-
-    private void askQuestion() {
-        switch (currentCategory()) {
-            case "Pop":
-                System.out.println(popQuestions.removeFirst());
-                break;
-            case "Science":
-                System.out.println(scienceQuestions.removeFirst());
-                break;
-            case "Sports":
-                System.out.println(sportsQuestions.removeFirst());
-                break;
-            default:
-                System.out.println(rockQuestions.removeFirst());
-                break;
-        }
-    }
-
-    private String currentCategory() {
-        int place = players.get(currentPlayer).getPlace();
-
-        if (place % 4 == 0) return "Pop";
-        if (place % 4 == 1) return "Science";
-        if (place % 4 == 2) return "Sports";
-        return "Rock";
-    }
-
     public boolean wasCorrectlyAnswered() {
-        Player player = players.get(currentPlayer);
+        Player player = currentPlayer();
 
         if (player.isInPenaltyBox() && !player.isGettingOutOfPenaltyBox()) {
             nextPlayer();
             return true;
         }
 
-        System.out.println(player.isInPenaltyBox()
-                ? "Answer was correct!!!!"
-                : "Answer was corrent!!!!");
-
-        player.addCoin();
-        System.out.println(player + " now has " + player.getPurse() + " Gold Coins.");
+        rewardCorrectAnswer(player);
 
         boolean notAWinner = !player.hasWon();
         nextPlayer();
@@ -121,7 +62,7 @@ public class Game {
     }
 
     public boolean wrongAnswer() {
-        Player player = players.get(currentPlayer);
+        Player player = currentPlayer();
 
         System.out.println("Question was incorrectly answered");
         System.out.println(player + " was sent to the penalty box");
@@ -129,6 +70,42 @@ public class Game {
 
         nextPlayer();
         return true;
+    }
+
+    // Decide, pelo dado, se o jogador sai da penalty box nesta rodada.
+    private boolean leavesPenaltyBox(Player player, int roll) {
+        player.tryToLeavePenaltyBox(roll);
+
+        if (!player.isGettingOutOfPenaltyBox()) {
+            System.out.println(player + " is not getting out of the penalty box");
+            return false;
+        }
+
+        System.out.println(player + " is getting out of the penalty box");
+        return true;
+    }
+
+    private void movePlayerAndAskQuestion(Player player, int roll) {
+        player.move(roll, BOARD_SIZE);
+        Category category = Category.fromPlace(player.getPlace());
+
+        System.out.println(player + "'s new location is " + player.getPlace());
+        System.out.println("The category is " + category);
+        System.out.println(questions.nextQuestion(category));
+    }
+
+    // Mensagem preservada do código original (inclusive o erro de digitação "corrent").
+    private void rewardCorrectAnswer(Player player) {
+        System.out.println(player.isInPenaltyBox()
+                ? "Answer was correct!!!!"
+                : "Answer was corrent!!!!");
+
+        player.addCoin();
+        System.out.println(player + " now has " + player.getPurse() + " Gold Coins.");
+    }
+
+    private Player currentPlayer() {
+        return players.get(currentPlayer);
     }
 
     private void nextPlayer() {
